@@ -45,6 +45,8 @@ linear_extrude(1000,center=true){
 translate([0,0,20]) linear_extrude(30,center=true){
     translate([47/2,47/2]) circle(d=12);
     translate([-47/2,47/2]) circle(d=12);
+}
+translate([0,0,30]) linear_extrude(30,center=true){
     translate([47/2,-47/2]) circle(d=12);
     translate([-47/2,-47/2]) circle(d=12);
 }
