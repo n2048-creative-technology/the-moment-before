@@ -50,14 +50,14 @@ translate([0,0,20]) linear_extrude(30,center=true){
 }
 
 difference(){
-    translate([0,19,17]) cube([100,19,16],center=true);
+    translate([0,21,17]) cube([100,25,16],center=true);
     difference(){
-        translate([0,19,17]) cube([100,3,16+16],center=true);
+        translate([0,21,17]) cube([100,2.5,32],center=true);
     }
 }
 
-translate([0,19,17]) cube([100,4,16-8],center=true);
-translate([-33,3,28]) cube([6.08+10,12.85,10]);
+translate([0,21,17]) cube([100,6,10],center=true);
+translate([-33,3,28]) cube([16.08,12.85,10]);
 
 translate([-33,6,30]) cube([20,5,10]);
 translate([-15.5,-39,30]) cube([5,50,10]);
