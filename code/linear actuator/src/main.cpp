@@ -7,6 +7,7 @@ constexpr uint8_t PIN_DIR   = 8;   // DIR+
 constexpr uint8_t PIN_ENA   = 7;   // ENA+ (active HIGH on most drivers)
 constexpr uint8_t PIN_ALM   = 2;   // ALARM from driver
 constexpr uint8_t PIN_LIMIT = 5;   // Limit switch (HOME), wired to GND (active LOW)
+constexpr uint8_t PIN_LED   = 13;  // onboard LED Nano Every
 
 // --------------- Motion profile / travel --------------------
 const long POS_A = 0;              // first endpoint (steps)
@@ -38,6 +39,35 @@ bool inHoming    = false;
 unsigned long limitHeldSince = 0;    // 0 = not timing
 unsigned long alarmHeldSince = 0;    // 0 = not timing
 const unsigned long maxSafeTime = 200; // ms (kept as in your code)
+
+
+// ---------------- LED State Indicator ------------------------
+void updateLED() {
+  static unsigned long lastToggle = 0;
+  static bool ledState = false;
+  unsigned long now = millis();
+
+  if (safetyFault) {
+    // Blink fast (4Hz ~ toggle every 125ms)
+    if (now - lastToggle >= 125) {
+      ledState = !ledState;
+      digitalWrite(PIN_LED, ledState);
+      lastToggle = now;
+    }
+  } else if (runState == RUNNING) {
+    digitalWrite(PIN_LED, HIGH);  // steady ON
+  } else if (runState == PAUSED) {
+    // Blink slow (1Hz ~ toggle every 1s)
+    if (now - lastToggle >= 1000) {
+      ledState = !ledState;
+      digitalWrite(PIN_LED, ledState);
+      lastToggle = now;
+    }
+  } else if (runState == PAUSING) {
+    digitalWrite(PIN_LED, HIGH); // still ON while decelerating
+  }
+}
+
 
 inline void latchFault(const __FlashStringHelper* why) {
   if (safetyFault) return;
@@ -77,7 +107,9 @@ inline void checkSafety() {
 
 // -------------------- Homing -------------------------------
 void homeSequence() {
+
   inHoming = true;
+  digitalWrite(PIN_LED, LOW);
 
   Serial.println("initiating homing sequence");
   stepper.enableOutputs();
@@ -169,6 +201,7 @@ void setup() {
   pinMode(PIN_PUL, OUTPUT); digitalWrite(PIN_PUL, LOW);
   pinMode(PIN_DIR, OUTPUT); digitalWrite(PIN_DIR, LOW);
   pinMode(PIN_LIMIT, INPUT_PULLUP); // active LOW (kept as-is)
+  pinMode(PIN_LED, OUTPUT);
 
   stepper.setPinsInverted(LOW,LOW,HIGH);
   stepper.setEnablePin(PIN_ENA);
@@ -189,6 +222,7 @@ void setup() {
 
 void loop() {
   checkSafety();
+  updateLED();
   if (safetyFault) return;
 
   // ---- Pause scheduler ----
