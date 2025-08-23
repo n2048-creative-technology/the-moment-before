@@ -9,26 +9,35 @@ constexpr uint8_t PIN_ALM   = 2;   // ALARM from driver
 constexpr uint8_t PIN_LIMIT = 5;   // Limit switch (HOME), wired to GND (active LOW)
 
 // --------------- Motion profile / travel --------------------
-const long POS_A = 0;        // first endpoint (steps)
-const long POS_B = 3700;     // second endpoint (steps)  (e.g. 1 rev @ 200*32u)
-const float MAX_SPEED = 1800;     // steps/s (top speed after homing)
-const float ACCEL     = 5000;    // steps/s^2
+const long POS_A = 0;              // first endpoint (steps)
+const long POS_B = 3700;           // second endpoint (steps)
+const float MAX_SPEED = 1800;      // steps/s (top speed after homing)
+const float ACCEL     = 5000;      // steps/s^2
 
 // --------------- Homing parameters --------------------------
-const float HOME_FAST  = 500;     // steps/s during fast seek
-const float HOME_SLOW  = 200;     // steps/s during latch approach
-const long  HOME_CLEAR = 100;     // steps to move off the switch before final latch
-const long  HOME_OFFSET = 0;      // set to a few steps if you want zero a bit off the switch
+const float HOME_FAST  = 500;      // steps/s during fast seek
+const float HOME_SLOW  = 200;      // steps/s during latch approach
+const long  HOME_CLEAR = 100;      // steps to move off the switch before final latch
+const long  HOME_OFFSET = 0;
+
+// --------------- Pause scheduler ----------------------------
+const unsigned long RUN_INTERVAL_MS = 1UL * 60UL * 1000UL;  // 30 minutes
+const unsigned long PAUSE_MS        = 1UL  * 60UL * 1000UL;  // 5 minutes
+
+enum RunState : uint8_t { RUNNING, PAUSING, PAUSED };
+RunState runState = RUNNING;
+unsigned long lastResumeMs = 0;    // when RUNNING started
+unsigned long pauseStartMs = 0;    // when PAUSED started
 
 // ----------------------------------------------------------------
 AccelStepper stepper(AccelStepper::DRIVER, PIN_PUL, PIN_DIR);
 
-// ---------------- SAFETY (limit/alarm held > 1s) -------------
+// ---------------- SAFETY (limit/alarm held > threshold) -------
 bool safetyFault = false;
-bool inHoming    = false;            
+bool inHoming    = false;
 unsigned long limitHeldSince = 0;    // 0 = not timing
 unsigned long alarmHeldSince = 0;    // 0 = not timing
-const unsigned long maxSafeTime = 200; //ms
+const unsigned long maxSafeTime = 200; // ms (kept as in your code)
 
 inline void latchFault(const __FlashStringHelper* why) {
   if (safetyFault) return;
@@ -37,13 +46,12 @@ inline void latchFault(const __FlashStringHelper* why) {
   stepper.disableOutputs();   // disable driver immediately
   Serial.print(F("SAFETY FAULT: "));
   Serial.print(why);
-  Serial.println(F(" > 1s. Motor disabled. Reset required."));
+  Serial.println(F(" > threshold. Motor disabled. Reset required."));
 }
 
 inline void checkSafety() {
-  // ----- Limit (active-LOW). Only enforce during normal motion, not homing -----
   if (!safetyFault) {
-    bool limitActive = (digitalRead(PIN_LIMIT) == HIGH);
+    bool limitActive = (digitalRead(PIN_LIMIT) == HIGH); // kept as in your code
     if (limitActive) {
       if (limitHeldSince == 0) limitHeldSince = millis();
       if (millis() - limitHeldSince >= maxSafeTime) {
@@ -54,9 +62,8 @@ inline void checkSafety() {
     }
   }
 
-  // ----- Driver Alarm (active-HIGH). Enforce ALWAYS (even during homing) -----
   if (!safetyFault) {
-    bool alarmActive = (digitalRead(PIN_ALM) == LOW);
+    bool alarmActive = (digitalRead(PIN_ALM) == LOW);    // kept as in your code
     if (alarmActive) {
       if (alarmHeldSince == 0) alarmHeldSince = millis();
       if (millis() - alarmHeldSince >= maxSafeTime) {
@@ -68,26 +75,23 @@ inline void checkSafety() {
   }
 }
 
+// -------------------- Homing -------------------------------
 void homeSequence() {
-
   inHoming = true;
 
-  Serial.println("initiating homing sequance");
-
-  Serial.println("// Enable driver to move");
+  Serial.println("initiating homing sequence");
   stepper.enableOutputs();
 
-  // Ensure known direction (toward switch = negative)
-  stepper.setMinPulseWidth(2);         // HB808C min pulse width ~2 µs
+  stepper.setMinPulseWidth(2);
   stepper.setMaxSpeed(HOME_FAST);
 
   Serial.println("1) FAST SEEK toward the switch until it engages (active LOW)");
   stepper.setSpeed(-HOME_FAST);
-  while (digitalRead(PIN_LIMIT) == LOW) {
+  while (digitalRead(PIN_LIMIT) == LOW) {      // kept as in your code
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
-  delay(20); // crude debounce
+  delay(20);
 
   Serial.println("2) BACK OFF until switch releases");
   stepper.setSpeed(+HOME_FAST);
@@ -95,20 +99,19 @@ void homeSequence() {
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
-  // move a little extra clear
+
   stepper.setAcceleration(ACCEL);
   stepper.move(HOME_CLEAR);
   stepper.runToPosition();
 
-  
   Serial.println("3) SLOW APPROACH for precise latch");
-  stepper.setAcceleration(0);          // use runSpeed for constant speed
+  stepper.setAcceleration(0);
   stepper.setSpeed(-HOME_SLOW);
   while (digitalRead(PIN_LIMIT) == HIGH) {
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
-  delay(20); // debounce
+  delay(20);
 
   Serial.println("4) Set zero, offset, and restore normal motion params");
   stepper.setCurrentPosition(0);
@@ -127,72 +130,109 @@ void homeSequence() {
   inHoming = false;
 }
 
+// -------------- Pause state machine helpers -----------------
+inline void startPausing() {
+  runState = PAUSING;
+  Serial.println(F("Pause window reached → stopping motion..."));
+  stepper.stop();                 // decelerate to stop
+}
+
+inline void maybeDisableWhenStopped() {
+  // Consider the motor stopped when both are true:
+  if (stepper.distanceToGo() == 0 && stepper.speed() == 0.0f) {
+    stepper.disableOutputs();     // disable during the pause
+    pauseStartMs = millis();
+    runState = PAUSED;
+    Serial.println(F("Paused: motor disabled. Waiting 5 minutes..."));
+  }
+}
+
+inline void resumeAfterPause() {
+  Serial.println(F("Pause finished → homing and resuming"));
+  // Re-home (this function enables outputs internally)
+  homeSequence();
+  if (!safetyFault) {
+    // Resume ping-pong
+    stepper.moveTo(POS_B);
+    lastResumeMs = millis();
+    runState = RUNNING;
+    Serial.println(F("Resumed: ping-pong restarted"));
+  }
+}
+
+// -------------------- Setup / Loop --------------------------
 void setup() {
   Serial.begin(115200);
-
   Serial.println("setup");
 
-  pinMode(PIN_ALM, INPUT_PULLUP); // HIGH = alarm
-
-  // Keep outputs quiet at boot
+  pinMode(PIN_ALM, INPUT_PULLUP); // HIGH = alarm (kept as-is)
   pinMode(PIN_PUL, OUTPUT); digitalWrite(PIN_PUL, LOW);
   pinMode(PIN_DIR, OUTPUT); digitalWrite(PIN_DIR, LOW);
-  
-  // Attach stepper and basic setup
-  stepper.setPinsInverted(LOW,LOW,HIGH);
+  pinMode(PIN_LIMIT, INPUT_PULLUP); // active LOW (kept as-is)
 
-  // hold disabled until we start homing
+  stepper.setPinsInverted(LOW,LOW,HIGH);
   stepper.setEnablePin(PIN_ENA);
   stepper.disableOutputs();
 
-  // Limit switch: to GND, use internal pull-up → LOW when pressed
-  pinMode(PIN_LIMIT, INPUT_PULLUP);
-
-  stepper.setMinPulseWidth(2);          // 2 µs step pulse
+  stepper.setMinPulseWidth(2);
   stepper.setMaxSpeed(MAX_SPEED);
   stepper.setAcceleration(ACCEL);
 
-  delay(300);                           // settle
-  homeSequence();                       // do the homing pass
-
-  // Start ping-pong motion at POS_B
-  stepper.moveTo(POS_B);
+  delay(300);
+  homeSequence();
+  if (!safetyFault) {
+    stepper.moveTo(POS_B);
+    lastResumeMs = millis();
+    runState = RUNNING;
+  }
 }
 
 void loop() {
-
   checkSafety();
-  if (safetyFault) {
-    // Stay inert until manual reset
-    return;
+  if (safetyFault) return;
+
+  // ---- Pause scheduler ----
+  const unsigned long now = millis();
+
+  switch (runState) {
+    case RUNNING:
+      // trigger pause every RUN_INTERVAL_MS since last resume
+      if (!inHoming && (now - lastResumeMs >= RUN_INTERVAL_MS)) {
+        startPausing();
+      }
+      break;
+
+    case PAUSING:
+      // keep running stepper until it has fully stopped, then disable outputs
+      stepper.run();
+      maybeDisableWhenStopped();
+      break;
+
+    case PAUSED:
+      // wait out the pause time with outputs disabled, then home & resume
+      if (now - pauseStartMs >= PAUSE_MS) {
+        resumeAfterPause();
+      }
+      break;
   }
 
-  // Serial.print("ALARM: ");
-  // Serial.print(digitalRead(PIN_ALM) );
-  // Serial.print(", LIMIT: ");
-  // Serial.print(digitalRead(PIN_LIMIT) );
-  // Serial.print(", SPEED: ");
-  // Serial.print(stepper.speed() );
-  // Serial.print(", POS: ");
-  // Serial.print(stepper.currentPosition() );
-  // Serial.print(", TARGET: ");
-  // Serial.println(stepper.targetPosition() );
+  // ---- Normal motion (only when RUNNING) ----
+  if (runState == RUNNING) {
+    // Optional: re-home if your limit logic declares it
+    if (digitalRead(PIN_LIMIT) == HIGH) {          // kept as in your code
+      Serial.println("Limit triggered → re-homing");
+      homeSequence();
+      if (!safetyFault) {
+        stepper.moveTo(POS_B);
+        lastResumeMs = now; // reset the 30-min window after a re-home
+      }
+    }
 
-  if (digitalRead(PIN_LIMIT) == HIGH) {
-    Serial.println("Limit triggered");
-    homeSequence();
-    if (!safetyFault) stepper.moveTo(POS_B);
+    stepper.run();
+
+    if (stepper.distanceToGo() == 0) {
+      long next = (stepper.targetPosition() == POS_B) ? POS_A : POS_B;
+      stepper.moveTo(next);
+    }
   }
-
-  // Run the current move
-  stepper.run();
-
-  // When we hit the target, flip to the other end
-  if (stepper.distanceToGo() == 0) {
-    long next = (stepper.targetPosition() == POS_B) ? POS_A : POS_B;
-    stepper.moveTo(next);
-  }
-
 }
-
-  
