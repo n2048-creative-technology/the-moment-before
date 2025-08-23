@@ -10,14 +10,14 @@ constexpr uint8_t PIN_LIMIT = 5;   // Limit switch (HOME), wired to GND (active 
 
 // --------------- Motion profile / travel --------------------
 const long POS_A = 0;        // first endpoint (steps)
-const long POS_B = 3600;     // second endpoint (steps)  (e.g. 1 rev @ 200*32u)
+const long POS_B = 3700;     // second endpoint (steps)  (e.g. 1 rev @ 200*32u)
 const float MAX_SPEED = 1800;     // steps/s (top speed after homing)
 const float ACCEL     = 5000;    // steps/s^2
 
 // --------------- Homing parameters --------------------------
 const float HOME_FAST  = 500;     // steps/s during fast seek
 const float HOME_SLOW  = 200;     // steps/s during latch approach
-const long  HOME_CLEAR = 200;     // steps to move off the switch before final latch
+const long  HOME_CLEAR = 100;     // steps to move off the switch before final latch
 const long  HOME_OFFSET = 0;      // set to a few steps if you want zero a bit off the switch
 
 // ----------------------------------------------------------------
