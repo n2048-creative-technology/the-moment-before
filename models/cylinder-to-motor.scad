@@ -37,6 +37,7 @@ difference(){
 
     // guide
     translate([0,23,17]) cube([100,17,17],center=true);
+#    translate([0,23,17]) cube([100,22,12],center=true);
 
     translate([33,23,17]) rotate([0,90]) 
         for(i=[0:2]) rotate(90*i-90) translate([20,0])
