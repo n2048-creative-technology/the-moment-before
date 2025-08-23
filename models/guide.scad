@@ -1,7 +1,7 @@
 $fn=100;
 
 linear_extrude(20){
-    difference(){
+#    difference(){
         union(){
             offset(0.2) offset(-0.2) square([2.5,5],center=true);
             translate([0,1]) offset(0.2) offset(-0.2) square([2.5,5],center=true);
