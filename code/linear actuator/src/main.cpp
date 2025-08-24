@@ -11,7 +11,7 @@ constexpr uint8_t PIN_LED   = 13;  // onboard LED Nano Every
 
 // --------------- Motion profile / travel --------------------
 const long POS_A = 0;              // first endpoint (steps)
-const long POS_B = 3700;           // second endpoint (steps)
+const long POS_B = 3000; // 3700;           // second endpoint (steps)
 float MAX_SPEED = 1800;      // steps/s (top speed after homing)
 const float ACCEL     = 5000;      // steps/s^2
 const float SPEED_VARIANCE = 500;  // each RUN interval with randomly adjust to a new speed
@@ -234,7 +234,10 @@ void setup() {
 void loop() {
   checkSafety();
   updateLED();
+
   if (safetyFault) return;
+
+  // if(!inHoming && digitalRead(PIN_LIMIT) == HIGH)  resumeAfterPause();
 
   // ---- Pause scheduler ----
   const unsigned long now = millis();
@@ -243,6 +246,7 @@ void loop() {
     case RUNNING:
       // trigger pause every RUN_INTERVAL_MS since last resume
       if (!inHoming && (now - lastResumeMs >= RUN_INTERVAL_MS)) {
+        delay(1000);
         startPausing();
       }
       break;
