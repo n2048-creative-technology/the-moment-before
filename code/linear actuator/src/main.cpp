@@ -12,8 +12,9 @@ constexpr uint8_t PIN_LED   = 13;  // onboard LED Nano Every
 // --------------- Motion profile / travel --------------------
 const long POS_A = 0;              // first endpoint (steps)
 const long POS_B = 3700;           // second endpoint (steps)
-const float MAX_SPEED = 1800;      // steps/s (top speed after homing)
+float MAX_SPEED = 1800;      // steps/s (top speed after homing)
 const float ACCEL     = 5000;      // steps/s^2
+const float SPEED_VARIANCE = 500;  // each RUN interval with randomly adjust to a new speed
 
 // --------------- Homing parameters --------------------------
 const float HOME_FAST  = 500;      // steps/s during fast seek
@@ -22,8 +23,10 @@ const long  HOME_CLEAR = 100;      // steps to move off the switch before final 
 const long  HOME_OFFSET = 0;
 
 // --------------- Pause scheduler ----------------------------
-const unsigned long RUN_INTERVAL_MS = 1UL * 60UL * 1000UL;  // 30 minutes
-const unsigned long PAUSE_MS        = 1UL  * 60UL * 1000UL;  // 5 minutes
+unsigned long RUN_INTERVAL_MS = 2UL * 60UL * 1000UL;  // 30 minutes
+unsigned long PAUSE_MS        = 1UL  * 60UL * 1000UL;  // 1 minutes
+const unsigned long PAUSE_VARIANCE        = 30UL * 1000UL;  // 30 seconds
+const unsigned long RUN_VARIANCE_VARIANCE =  1UL  * 60UL * 1000UL;  // 1 minute
 
 enum RunState : uint8_t { RUNNING, PAUSING, PAUSED };
 RunState runState = RUNNING;
@@ -183,6 +186,14 @@ inline void resumeAfterPause() {
   Serial.println(F("Pause finished → homing and resuming"));
   // Re-home (this function enables outputs internally)
   homeSequence();
+
+  // adjust values for next round: 
+
+  // --------------- Pause scheduler ----------------------------
+  RUN_INTERVAL_MS = 2UL * 60UL * 1000UL  + random(RUN_VARIANCE_VARIANCE);
+  PAUSE_MS        = 1UL  * 60UL * 1000UL + random(PAUSE_VARIANCE); 
+  MAX_SPEED = 1800 + random(SPEED_VARIANCE) - SPEED_VARIANCE/2;
+
   if (!safetyFault) {
     // Resume ping-pong
     stepper.moveTo(POS_B);
