@@ -28,19 +28,19 @@ module bevelCube(size,radius=0, center=false){
 }
 
 difference(){
-bevelCube([50,50,20],radius=1,center=true, $fn=60);
+bevelCube([70,70,20],radius=1,center=true, $fn=60);
 
-translate([0,0,-4]) bevelCube([40,40,10],radius=1,center=true, $fn=60);
+translate([0,0,-4]) bevelCube([60,60,10],radius=1,center=true, $fn=60);
 
 linear_extrude(11) {
     translate([0,0]) circle(d=5.5); // screw fitting
     
-    translate([0,15]) circle(d=5.5); // screw fitting
-    translate([10,15]) circle(d=5.5); // screw fitting
-    translate([-10,15]) circle(d=5.5); // screw fitting
+    translate([0,25]) circle(d=5.5); // screw fitting
+    translate([20,25]) circle(d=5.5); // screw fitting
+    translate([-20,25]) circle(d=5.5); // screw fitting
 
-    translate([0,-15]) circle(d=5.5); // screw fitting
-    translate([10,-15]) circle(d=5.5); // screw fitting
-    translate([-10,-15]) circle(d=5.5); // screw fitting    
+    translate([0,-25]) circle(d=5.5); // screw fitting
+    translate([20,-25]) circle(d=5.5); // screw fitting
+    translate([-20,-25]) circle(d=5.5); // screw fitting    
 }
 }
