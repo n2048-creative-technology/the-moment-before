@@ -22,4 +22,4 @@ ON  -> running
 SLOW blink -> in pause
 FAST blink -> failed --> requires manual reset/
 
-[mages/Mauricio_van%20der%20Maesen%20de%20Sombreff_The%20moment%20before_installation.jpg]
+ ![the moment before](./images/Mauricio_van%20der%20Maesen%20de%20Sombreff_The%20moment%20before_installation.jpg]
