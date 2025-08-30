@@ -5,11 +5,6 @@ contracted_spring_height = 8.3;
 mid_lenth = (extended_spring_height+contracted_spring_height)*2/3;
 
 module pin(){
-    linear_extrude(5) difference() {
-        offset(5) offset(-5) square(45, center=true);
-        for(i=[0:90:360]) rotate(i) translate([15,15]) circle(d=5);
-            circle(d=5.5);
-    }
     linear_extrude(mid_lenth) {
         difference() {
             union(){
@@ -46,6 +41,6 @@ module conepin() {
     
 }
 
-!translate([0,0,extended_spring_height*2]) mirror([0,0,1]) conepin();
+translate([0,0,extended_spring_height*2]) mirror([0,0,1]) conepin();
 pin();
-base();
+//base();
