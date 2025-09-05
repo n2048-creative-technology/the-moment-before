@@ -1,18 +1,16 @@
 $fn=360;
 
-thickness=3;
+thickness=1.5;
 OD=65;
 ID=OD-2*thickness;
 of=0.2;
 
 difference(){
-linear_extrude(20) circle(d=ID-1-of);
-linear_extrude(150,center=true) circle(d=3+of);
-translate([0,0,-1] )linear_extrude(6) circle(d=10);
-translate([0,0,+5] )linear_extrude(15) difference() circle(d=ID-16);
+linear_extrude(12) circle(d=ID-6-of);
+translate([0,0,+5] )linear_extrude(30) circle(d=ID-35);
     
-translate([0,0,6]) rotate_extrude() translate([(62-6)/2,0]) square([6.3,6.1],center=true);
-translate([0,0,14]) rotate_extrude() translate([(62-6)/2,0])  square([6.3,6.1],center=true);
+translate([0,0,6]) rotate_extrude() translate([(ID-6)/2,0]) circle(d=6);
+    
 }
 
 
@@ -24,7 +22,7 @@ t=8;
 
 difference(){
     union(){
-linear_extrude(20) difference(){
+linear_extrude(16) difference(){
     translate([0,0,0]) square([15.33+2*t,15.33+2*t],center=true);
     square(15.33,center=true);
 }
@@ -48,7 +46,7 @@ linear_extrude(25,center=true) circle(2);
 }
 }
 
-translate([0,0,25]) rotate([90,0]) linear_extrude(100,center=true ) {
+translate([0,0,20]) rotate([90,0]) linear_extrude(100,center=true ) {
     circle(d=4);
     square([1.5,5.5],center=true);
 }
