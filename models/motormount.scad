@@ -64,7 +64,7 @@ difference(){
 translate([0,21,17]) cube([100,15,11],center=true);
 
 // limit switch
-translate([-33,4,26.7]) cube([16.08,12.85,10]);
+#translate([-33,4,26.7]) cube([16.08,12.85,10]);
 translate([-33,6,29]) cube([20,5,10]);
 translate([-15.5,-39,29]) cube([5,50,10]);
 

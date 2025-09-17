@@ -10,7 +10,7 @@ difference(){
  linear_extrude(30) circle(d=ID-6-of);
 
     
-translate([0,0,5]) rotate_extrude() translate([(ID-6)/2,0]) circle(d=6);
+#translate([0,0,5]) rotate_extrude() translate([(ID-6)/2,0]) circle(d=6);
 translate([0,0,15]) rotate_extrude() translate([(ID-6)/2,0]) circle(d=6);
     
     

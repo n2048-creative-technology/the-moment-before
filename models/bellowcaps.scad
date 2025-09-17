@@ -11,7 +11,8 @@ translate([0,0,17]) linear_extrude(3,scale=0.98){
 translate([0,0,10])linear_extrude(20){
         offset(-10) square([70,110],center=true);       
 }
-linear_extrude(20){
+
+#linear_extrude(20){
         circle(d=6);
         translate([-10,-10]) {
             for(x=[0:4:20])for(y=[0:4:20]) translate([x,y])
