@@ -1,0 +1,22 @@
+# Pick And Place List
+# Company=
+# Author=
+# eMail=
+#
+# Project=arduino-nano-motor-controller
+# Date=15:34:43
+# CreatedBy=Fritzing 1.0.1rc.2024-04-08.debian/1.0.1-1build4
+#
+#
+# Coordinates in mils, always center of component
+# Origin 0/0=Lower left corner of PCB
+# Rotation in degree (0-360, math. pos.)
+#
+RefDes,Description,Package,X,Y,Rotation,Side,Mount
+Description: resistance;capacitance;inductance;voltage;current;power;mpn;mn;
+L2,";;;;;;;;","THT",127.646,1151.61,90,Top,THT
+5v,";;;;;;;;","THT",1025.91,105.756,90,Top,THT
+Vin,";;;;;;;;","THT",1312.63,106.01,90,Top,THT
+Nano1,";;;;;;;;","",782.172,670.971,90,Top,MANUAL
+P+ P- D+ D- E+ E- A+ A-,";;;;;;;;","THT",931.928,1301.02,90,Top,THT
+L1,";;;;;;;;","THT",130.333,1296.78,90,Top,THT
