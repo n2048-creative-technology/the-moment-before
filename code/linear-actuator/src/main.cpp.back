@@ -14,10 +14,9 @@ constexpr uint8_t PIN_LED   = 13;  // onboard LED Nano Every
 // --------------- Motion profile / travel --------------------
 const long POS_A = 0;              // first endpoint (steps)
 long POS_B = 3000; // 3700;           // second endpoint (steps)
-float MAX_SPEED_INIT = 200;//1800;      // steps/s (top speed after homing)
-float MAX_SPEED = MAX_SPEED_INIT;//1800;      // steps/s (top speed after homing)
-const float ACCEL     = 2*MAX_SPEED; // 5000;      // steps/s^2
-const float SPEED_VARIANCE = MAX_SPEED/2;  // each RUN interval with randomly adjust to a new speed
+float MAX_SPEED = 1800;      // steps/s (top speed after homing)
+const float ACCEL     = 5000;      // steps/s^2
+const float SPEED_VARIANCE = 500;  // each RUN interval with randomly adjust to a new speed
 
 // --------------- Homing parameters --------------------------
 const float HOME_FAST  = 500;      // steps/s during fast seek
@@ -45,49 +44,6 @@ bool inHoming    = false;
 unsigned long limitHeldSince = 0;    // 0 = not timing
 unsigned long alarmHeldSince = 0;    // 0 = not timing
 const unsigned long maxSafeTime = 200; // ms (kept as in your code)
-
-constexpr unsigned long LIMIT_DEBOUNCE_MS = 5;
-
-struct DebouncedSwitch {
-  bool stableState;
-  bool lastRawState;
-  unsigned long lastChangeMs;
-};
-
-DebouncedSwitch limitMinSwitch{HIGH, HIGH, 0};
-DebouncedSwitch limitMaxSwitch{HIGH, HIGH, 0};
-DebouncedSwitch limitMax2Switch{HIGH, HIGH, 0};
-
-inline bool readDebounced(uint8_t pin, DebouncedSwitch &sw) {
-  bool rawState = digitalRead(pin);
-  unsigned long now = millis();
-
-  if (rawState != sw.lastRawState) {
-    sw.lastRawState = rawState;
-    sw.lastChangeMs = now;
-  }
-
-  if (rawState != sw.stableState && (now - sw.lastChangeMs) >= LIMIT_DEBOUNCE_MS) {
-    sw.stableState = rawState;
-  }
-
-  return sw.stableState;
-}
-
-inline bool limitMinActive() {
-  return readDebounced(PIN_LIMIT_MIN, limitMinSwitch) == HIGH;
-}
-
-inline bool limitMaxActive() {
-  return readDebounced(PIN_LIMIT_MAX, limitMaxSwitch) == HIGH;
-}
-
-inline void initDebouncedSwitch(uint8_t pin, DebouncedSwitch &sw) {
-  bool state = digitalRead(pin);
-  sw.stableState = state;
-  sw.lastRawState = state;
-  sw.lastChangeMs = millis();
-}
 
 
 // ---------------- LED State Indicator ------------------------
@@ -130,7 +86,7 @@ inline void latchFault(const __FlashStringHelper* why) {
 
 inline void checkSafety() {
   if (!safetyFault) {
-    bool limitActive = limitMinActive() || limitMaxActive();
+    bool limitActive = (digitalRead(PIN_LIMIT_MIN) == HIGH) || (digitalRead(PIN_LIMIT_MAX) == HIGH); // kept as in your code
     if (limitActive) {
       if (limitHeldSince == 0) limitHeldSince = millis();
       if (millis() - limitHeldSince >= maxSafeTime) {
@@ -168,7 +124,7 @@ void homeSequence() {
 
   Serial.println("1) FAST SEEK toward the switch until it engages (active LOW)");
   stepper.setSpeed(-HOME_FAST);
-  while (!limitMinActive()) {
+  while (digitalRead(PIN_LIMIT_MIN) == LOW) {      // kept as in your code
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
@@ -176,7 +132,7 @@ void homeSequence() {
 
   Serial.println("2) BACK OFF until switch releases");
   stepper.setSpeed(+HOME_FAST);
-  while (limitMinActive()) {
+  while (digitalRead(PIN_LIMIT_MIN) == HIGH) {
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
@@ -188,7 +144,7 @@ void homeSequence() {
   Serial.println("3) SLOW APPROACH for precise latch");
   stepper.setAcceleration(0);
   stepper.setSpeed(-HOME_SLOW);
-  while (limitMinActive()) {
+  while (digitalRead(PIN_LIMIT_MIN) == HIGH) {
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
@@ -205,7 +161,9 @@ void homeSequence() {
     }
     stepper.setCurrentPosition(0);
   }
-  
+  stepper.setMaxSpeed(MAX_SPEED);
+  stepper.setAcceleration(ACCEL);
+
   // seek maximum Limit SW
 
   stepper.setMinPulseWidth(2);
@@ -213,7 +171,7 @@ void homeSequence() {
 
   Serial.println("1) FAST SEEK toward the Max switch until it engages (active LOW)");
   stepper.setSpeed(HOME_FAST);
-  while (!limitMaxActive()) {
+  while (digitalRead(PIN_LIMIT_MAX) == LOW) {      // kept as in your code
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
@@ -221,7 +179,7 @@ void homeSequence() {
 
   Serial.println("2) BACK OFF until Max switch releases");
   stepper.setSpeed(-HOME_FAST);
-  while (limitMaxActive()) {
+  while (digitalRead(PIN_LIMIT_MAX) == HIGH) {
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
@@ -260,7 +218,7 @@ inline void resumeAfterPause() {
   // --------------- Pause scheduler ----------------------------
   RUN_INTERVAL_MS = 2UL * 60UL * 1000UL  + random(RUN_VARIANCE_VARIANCE);
   PAUSE_MS        = 1UL  * 60UL * 1000UL + random(PAUSE_VARIANCE); 
-  MAX_SPEED = MAX_SPEED_INIT + random(SPEED_VARIANCE) - SPEED_VARIANCE/2;
+  MAX_SPEED = 1800 + random(SPEED_VARIANCE) - SPEED_VARIANCE/2;
 
   if (!safetyFault) {
     // Resume ping-pong
@@ -283,10 +241,6 @@ void setup() {
   pinMode(PIN_LIMIT_MAX, INPUT_PULLUP); // active LOW (kept as-is)
   pinMode(PIN_LIMIT_MAX2, INPUT_PULLUP); // active LOW (kept as-is)
   pinMode(PIN_LED, OUTPUT);
-
-  initDebouncedSwitch(PIN_LIMIT_MIN, limitMinSwitch);
-  initDebouncedSwitch(PIN_LIMIT_MAX, limitMaxSwitch);
-  initDebouncedSwitch(PIN_LIMIT_MAX2, limitMax2Switch);
 
   stepper.setPinsInverted(LOW,LOW,HIGH);
   stepper.setEnablePin(PIN_ENA);
@@ -342,7 +296,7 @@ void loop() {
   // ---- Normal motion (only when RUNNING) ----
   if (runState == RUNNING) {
     // Optional: re-home if your limit logic declares it
-    if (limitMinActive() || limitMaxActive()) {
+    if (digitalRead(PIN_LIMIT_MIN) == HIGH || digitalRead(PIN_LIMIT_MAX) == HIGH) {          // kept as in your code
       Serial.println("Limit triggered → re-homing");
       homeSequence();
       if (!safetyFault) {
@@ -354,8 +308,7 @@ void loop() {
     stepper.run();
 
     if (stepper.distanceToGo() == 0) {
-      // long next = (stepper.targetPosition() == POS_B) ? POS_A : POS_B;
-      long next = random(POS_A,POS_B);
+      long next = (stepper.targetPosition() == POS_B) ? POS_A : POS_B;
       stepper.moveTo(next);
     }
   }
