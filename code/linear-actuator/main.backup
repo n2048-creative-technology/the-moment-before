@@ -6,13 +6,12 @@ constexpr uint8_t PIN_PUL   = 9;   // STEP / PUL+
 constexpr uint8_t PIN_DIR   = 8;   // DIR+
 constexpr uint8_t PIN_ENA   = 7;   // ENA+ (active HIGH on most drivers)
 constexpr uint8_t PIN_ALM   = 2;   // ALARM from driver
-constexpr uint8_t PIN_LIMIT_MIN = 5;   // Limit switch (HOME), wired to GND (active LOW)
-constexpr uint8_t PIN_LIMIT_MAX = 4;   // Limit switch (Max), wired to GND (active LOW)
+constexpr uint8_t PIN_LIMIT = 5;   // Limit switch (HOME), wired to GND (active LOW)
 constexpr uint8_t PIN_LED   = 13;  // onboard LED Nano Every
 
 // --------------- Motion profile / travel --------------------
 const long POS_A = 0;              // first endpoint (steps)
-long POS_B = 3000; // 3700;           // second endpoint (steps)
+const long POS_B = 3000; // 3700;           // second endpoint (steps)
 float MAX_SPEED = 1800;      // steps/s (top speed after homing)
 const float ACCEL     = 5000;      // steps/s^2
 const float SPEED_VARIANCE = 500;  // each RUN interval with randomly adjust to a new speed
@@ -85,7 +84,7 @@ inline void latchFault(const __FlashStringHelper* why) {
 
 inline void checkSafety() {
   if (!safetyFault) {
-    bool limitActive = (digitalRead(PIN_LIMIT_MIN) == HIGH) || (digitalRead(PIN_LIMIT_MAX) == HIGH); // kept as in your code
+    bool limitActive = (digitalRead(PIN_LIMIT) == HIGH); // kept as in your code
     if (limitActive) {
       if (limitHeldSince == 0) limitHeldSince = millis();
       if (millis() - limitHeldSince >= maxSafeTime) {
@@ -123,7 +122,7 @@ void homeSequence() {
 
   Serial.println("1) FAST SEEK toward the switch until it engages (active LOW)");
   stepper.setSpeed(-HOME_FAST);
-  while (digitalRead(PIN_LIMIT_MIN) == LOW) {      // kept as in your code
+  while (digitalRead(PIN_LIMIT) == LOW) {      // kept as in your code
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
@@ -131,7 +130,7 @@ void homeSequence() {
 
   Serial.println("2) BACK OFF until switch releases");
   stepper.setSpeed(+HOME_FAST);
-  while (digitalRead(PIN_LIMIT_MIN) == HIGH) {
+  while (digitalRead(PIN_LIMIT) == HIGH) {
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
@@ -143,7 +142,7 @@ void homeSequence() {
   Serial.println("3) SLOW APPROACH for precise latch");
   stepper.setAcceleration(0);
   stepper.setSpeed(-HOME_SLOW);
-  while (digitalRead(PIN_LIMIT_MIN) == HIGH) {
+  while (digitalRead(PIN_LIMIT) == HIGH) {
     checkSafety(); if (safetyFault) { inHoming=false; return; }
     stepper.runSpeed();
   }
@@ -161,30 +160,6 @@ void homeSequence() {
     stepper.setCurrentPosition(0);
   }
   stepper.setMaxSpeed(MAX_SPEED);
-  stepper.setAcceleration(ACCEL);
-
-  // seek maximum Limit SW
-
-  stepper.setMinPulseWidth(2);
-  stepper.setMaxSpeed(HOME_FAST);
-
-  Serial.println("1) FAST SEEK toward the Max switch until it engages (active LOW)");
-  stepper.setSpeed(HOME_FAST);
-  while (digitalRead(PIN_LIMIT_MAX) == LOW) {      // kept as in your code
-    checkSafety(); if (safetyFault) { inHoming=false; return; }
-    stepper.runSpeed();
-  }
-  delay(20);
-
-  Serial.println("2) BACK OFF until Max switch releases");
-  stepper.setSpeed(-HOME_FAST);
-  while (digitalRead(PIN_LIMIT_MAX) == HIGH) {
-    checkSafety(); if (safetyFault) { inHoming=false; return; }
-    stepper.runSpeed();
-  }
-  POS_B = stepper.currentPosition();
-
-  stepper.setMaxSpeed(-MAX_SPEED);
   stepper.setAcceleration(ACCEL);
 
   inHoming = false;
@@ -236,8 +211,7 @@ void setup() {
   pinMode(PIN_ALM, INPUT_PULLUP); // HIGH = alarm (kept as-is)
   pinMode(PIN_PUL, OUTPUT); digitalWrite(PIN_PUL, LOW);
   pinMode(PIN_DIR, OUTPUT); digitalWrite(PIN_DIR, LOW);
-  pinMode(PIN_LIMIT_MIN, INPUT_PULLUP); // active LOW (kept as-is)
-  pinMode(PIN_LIMIT_MAX, INPUT_PULLUP); // active LOW (kept as-is)
+  pinMode(PIN_LIMIT, INPUT_PULLUP); // active LOW (kept as-is)
   pinMode(PIN_LED, OUTPUT);
 
   stepper.setPinsInverted(LOW,LOW,HIGH);
@@ -251,7 +225,7 @@ void setup() {
   delay(300);
   homeSequence();
   if (!safetyFault) {
-    stepper.moveTo(POS_A);
+    stepper.moveTo(POS_B);
     lastResumeMs = millis();
     runState = RUNNING;
   }
@@ -294,7 +268,7 @@ void loop() {
   // ---- Normal motion (only when RUNNING) ----
   if (runState == RUNNING) {
     // Optional: re-home if your limit logic declares it
-    if (digitalRead(PIN_LIMIT_MIN) == HIGH || digitalRead(PIN_LIMIT_MAX) == HIGH) {          // kept as in your code
+    if (digitalRead(PIN_LIMIT) == HIGH) {          // kept as in your code
       Serial.println("Limit triggered → re-homing");
       homeSequence();
       if (!safetyFault) {
